@@ -1,44 +1,50 @@
 package main
 
 import (
-	"flag"
+	"bufio"
 	"fmt"
-	"log"
+	"io/ioutil"
+	"net/http"
 	"os"
+	"string"
 
 	"github.com/pelletier/go-toml"
 	vt "github.com/VirusTotal/vt-go"
 )
 
-var sha256 = flag.String("sha256", "", "SHA-256 of some file")
 
 func main() {
-	flag.Parse()
 
-	if *sha256 == "" {
-		fmt.Println("Must pass the --sha256 argument.")
-		os.Exit(0)
+	// read IDS.txt
+	file, err := os.open("IDS.txt")
+	if(err != nil) {
+		fmt.Println("Error opening file", err)
+		return
 	}
+	defer file.Close()
 
-	// Load the API key from env.toml
-	apiKey, err := loadAPIKey("env.toml")
-	if err != nil {
-		log.Fatal(err)
+	scanner := bufio.NewScanner(file)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		parts := strings.Split(line, ";")
+		if len(parts) >= 2 {
+			sh1 := parts[1]
+
+			virusTotalResponse := callVirusTotalAPI(sha1)
+
+			fmt.Println("SHA1: ", sha1)
+			fmt.Println("VirusTotalResponse: ", virusTotalResponse)
+		}
 	}
+}
 
-	client := vt.NewClient(apiKey)
+func callVirusTotalAPI(sha1 string) string {
+	apiKey := loadAPIKey("env.toml")
 
-	file, err := client.GetObject(vt.URL("files/%s", *sha256))
-	if err != nil {
-		log.Fatal(err)
-	}
+	client := vt.NewClient(*apiKey)
 
-	ls, err := file.GetTime("last_submission_date")
-	if err != nil {
-		log.Fatal(err)
-	}
 
-	fmt.Printf("File %s was submitted for the last time on %v\n", file.ID(), ls)
 }
 
 func loadAPIKey(filename string) (string, error) {
